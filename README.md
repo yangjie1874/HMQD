@@ -32,7 +32,7 @@ We are committed to full reproducibility. This page already documents the comple
 | Pretrained weights | 🔒 Upon acceptance | `https://XXX` *(to be updated)* |
 | WS-D dataset (RGB-D) | 🔒 Upon acceptance | `https://XXX` *(to be updated)* |
 
-> 📦 **Model weights and dataset download:** `https://XXX` *(placeholder — to be replaced)*
+> 📦 **Model weights and dataset download:** https://drive.google.com/drive/folders/1eFtnyeHkhj9uz_DNVlhjlGOtXyIiygN8?usp=drive_link
 
 ---
 
