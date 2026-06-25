@@ -107,7 +107,6 @@ The **WS-D** dataset is a UAV-based RGB-D wheat scab detection dataset construct
 
 **Annotation quality control.** All diseased-spike regions were independently annotated by four agronomy experts following a unified annotation protocol. 10% of the images were randomly selected for cross-checking among the experts, and inconsistent or ambiguous annotations were resolved through joint discussion until consensus was reached, while invalid boxes were removed.
 
-> The WS-D dataset will be released at `https://XXX` *(to be updated)* upon acceptance.
 
 ---
 
