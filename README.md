@@ -251,8 +251,7 @@ If you find this work useful, please consider citing our paper (full citation wi
 
 ## 🙏 Acknowledgements
 
-This work is built upon the excellent [**RT-DETR**](https://github.com/lyuwenyu/RT-DETR) codebase. We also thank the authors of [Mamba / Vision Mamba](https://github.com/hustvl/Vim) and [Depth-Anything](https://github.com/DepthAnything) for their open-source contributions, which inspired parts of our design. We are grateful to the agronomy experts who participated in the construction and annotation of the WS-D dataset.
-
+This work is built upon the excellent [**RT-DETR**](https://github.com/lyuwenyu/RT-DETR) codebase. We also thank the authors of [Mamba / Vision Mamba](https://github.com/hustvl/Vim) and [Depth-Anything](https://github.com/DepthAnything) for their open-source contributions, which inspired parts of our design.
 ---
 
 ## 📬 Contact
