@@ -193,7 +193,6 @@ The metadata table will include at least the following fields:
 | `depth_path` | Depth file path |
 | `annotation_path` | COCO annotation file |
 
-> **TODO_VERIFY before final public release:** update exact site/plot/flight/session counts in `metadata/wsd_site_plot_flight_session_summary.csv` after final metadata audit.
 
 ### Annotation reliability
 
@@ -220,7 +219,6 @@ The cross-check table will report:
 | Added boxes after consensus | TODO_VERIFY |
 | Box-level agreement rate | TODO_VERIFY |
 
-> The `TODO_VERIFY` values are placeholders for the final audited annotation-quality statistics and should be replaced before repository release.
 
 ---
 
@@ -299,7 +297,7 @@ The released training configuration will include the complete augmentation setti
 | Mosaic | 0.0 | disabled for RGB-D alignment stability | — |
 | MixUp | 0.0 | disabled | — |
 
-> **TODO_VERIFY before final release:** ensure these values exactly match the final YAML training configuration. If the final RT-DETR baseline uses different augmentation ranges, update this table and `configs/*.yaml` consistently.
+
 
 ---
 
