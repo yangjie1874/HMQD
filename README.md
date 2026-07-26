@@ -6,241 +6,591 @@
 
 ## 📌 Overview
 
-**HMQD-Net** is a hierarchical multimodal representation and query-aware distillation network for **RGB-D (RGB + Depth)** wheat scab detection from unmanned aerial vehicle (UAV) imagery. Unmanned aerial vehicle remote sensing offers a feasible solution for large-scale wheat disease monitoring, yet existing UAV-based wheat scab detection methods still struggle with the small size of diseased spike targets, severe canopy occlusion, and the limited representational capacity of single-modal images.
+**HMQD-Net** is a hierarchical multimodal representation and query-aware distillation network for **RGB-D wheat scab detection** from unmanned aerial vehicle (UAV) imagery. UAV remote sensing provides a feasible solution for large-scale wheat disease monitoring, but wheat scab detection remains challenging because diseased spikes are small, partially occluded by dense canopy structures, and difficult to distinguish using single-modal images alone.
 
-To address these challenges, HMQD-Net is built on top of [**RT-DETR**](https://github.com/lyuwenyu/RT-DETR) and introduces a dual-branch, modality-specific design that explicitly handles the heterogeneity between appearance and geometric cues, performs selective cross-modal fusion, and refines the decoder queries at the decision level. The framework integrates four key components:
+HMQD-Net is built on top of [**RT-DETR**](https://github.com/lyuwenyu/RT-DETR) and integrates RGB appearance cues with depth structural cues through modality-specific representation learning, selective cross-modal fusion, and decoder-level query refinement.
 
-- **SSHR** — Sparse State-space Hierarchical Representation (RGB branch)
-- **PDER** — Progressive Depth Expert Routing (depth branch)
-- **DTF** — Dual-Stream Token-selective Fusion (cross-modal fusion)
-- **QAKD** — Query-Aware Knowledge Distillation (decoder-level distillation)
+The framework contains four key designs:
 
-HMQD-Net achieves **32.4% AP** and **68.7% AP50** on our self-constructed **WS-D** dataset, and generalizes well to the public **MSWDD** dataset (**76.8% AP**), while maintaining a favorable accuracy–efficiency trade-off and supporting real-time inference on resource-constrained edge devices.
+- **SSHR** — Sparse State-space Hierarchical Representation for the RGB branch.
+- **PDER** — Progressive Depth Expert Routing for the depth branch.
+- **DTF** — Dual-Stream Token-selective Fusion for RGB-D feature interaction.
+- **QAKD** — Query-Aware Knowledge Distillation for decoder-level query refinement.
+
+HMQD-Net achieves **32.4% AP** and **68.7% AP50** on the self-constructed **WS-D** dataset, and achieves **76.8% AP** on the public **MSWDD** dataset with pseudo-depth inputs, showing its applicability to UAV-based wheat disease monitoring.
 
 ---
 
 ## 🔔 Release Status
 
-> **Important.** This repository is being prepared for public release. To comply with our institutional and journal policies during the peer-review process, **the full source code, configuration files, pretrained model weights, and the WS-D dataset will be made publicly available upon acceptance of the paper.**
-
-We are committed to full reproducibility. This page already documents the complete method, training protocol, hyperparameters, dataset specification, and deployment procedure, so that the released code can be reproduced and verified without ambiguity. The repository structure, usage instructions, and result tables below reflect the final intended release.
+> **Important.** This repository is being prepared for public release. The full source code, fixed split files, preprocessing scripts, training configurations, pretrained weights, and the WS-D dataset will be made publicly available upon paper acceptance.
 
 | Resource | Status | Link |
 | --- | --- | --- |
-| Method description & documentation | ✅ Available (this page) | — |
-| Source code (training / inference) | 🔒 Upon acceptance | — |
-| Pretrained weights | 🔒 Upon acceptance | `https://XXX` *(to be updated)* |
-| WS-D dataset (RGB-D) | 🔒 Upon acceptance | `https://XXX` *(to be updated)* |
+| Method documentation | ✅ Available | This README |
+| Source code | 🔒 Upon acceptance | `TODO_UPDATE` |
+| WS-D dataset | 🔒 Upon acceptance | `TODO_UPDATE` |
+| Fixed split files | 🔒 Upon acceptance | `splits/wsd/*.txt` |
+| Pretrained weights | 🔒 Upon acceptance | `weights/*.pt` |
+| Reproduction scripts | 🔒 Upon acceptance | `scripts/*.sh` |
 
-> 📦 **Model weights and dataset download:** https://drive.google.com/drive/folders/1eFtnyeHkhj9uz_DNVlhjlGOtXyIiygN8?usp=drive_link
+Temporary dataset/model link used during review:
+
+```text
+https://drive.google.com/drive/folders/1eFtnyeHkhj9uz_DNVlhjlGOtXyIiygN8?usp=drive_link
+```
 
 ---
 
 ## ✨ Highlights
 
-- **A unified RGB-D framework for UAV-based wheat scab detection.** Unlike methods relying on a shared backbone and simple channel-level fusion, HMQD-Net explicitly addresses modality heterogeneity between appearance and geometric cues.
-- **Modality-specific hierarchical encoding.** SSHR strengthens long-range contextual modeling of disease appearance in the RGB branch via sparse region-level state-space scanning, while PDER adaptively captures disease-relevant geometric structures in the depth branch via a progressive mixture-of-experts routing mechanism.
-- **Selective cross-modal fusion.** DTF performs multi-scale channel alignment and token-selective attention, suppressing redundant background interactions instead of uniform pixel-wise fusion.
-- **Decision-level query distillation.** QAKD extends the improvement from the encoding stage to the decoder by selectively distilling high-confidence effective queries, improving small-target detection **without increasing inference cost**.
-- **A new UAV-based RGB-D wheat scab dataset (WS-D).** 1,950 spatially aligned RGB-D image pairs with 6,799 annotated diseased-spike instances, collected across three wheat-growing regions in Anhui Province, China.
-- **Edge-device validation.** Deployed on an NVIDIA Jetson Orin Nano 8GB via TensorRT (FP16), achieving near-real-time inference suitable for on-board UAV monitoring.
+- **UAV RGB-D wheat scab detection.** HMQD-Net explicitly combines RGB appearance information and depth geometric information for disease target detection in complex field scenes.
+- **Modality-specific feature encoding.** SSHR enhances long-range contextual modeling of disease appearance, while PDER captures disease-relevant depth structures through progressive expert routing.
+- **Selective multimodal fusion.** DTF performs multi-scale channel alignment and token-selective attention to suppress redundant background interactions.
+- **Query-aware distillation.** QAKD distills only high-confidence effective queries from a frozen teacher model, improving query-level prediction without increasing inference cost.
+- **Dataset contribution.** WS-D contains 1,950 spatially aligned RGB-D image pairs and 6,799 annotated diseased-spike instances.
 
 ---
 
-## 🧭 Method
+## 🧭 Method Overview
 
-HMQD-Net takes a wheat RGB image and its corresponding depth image as input and processes them through two modality-specific branches before selective fusion and query decoding.
+HMQD-Net takes spatially aligned RGB and depth images as input. The RGB image is processed by the SSHR-enhanced RGB branch, while the depth image is processed by the PDER-enhanced depth branch. Multi-scale features from both branches are then fused by DTF at P3, P4, and P5. The fused features are finally decoded by an RT-DETR decoder head. During training, QAKD uses a frozen teacher model to guide the student by distilling only high-confidence queries.
 
-```
-                 ┌─────────────────────────┐
-   RGB Image ──► │   RGB Branch  (SSHR)     │ ──► F3_r, F4_r, F5_r
-                 └─────────────────────────┘             │
-                                                          ▼
-                                              ┌───────────────────────┐
-                                              │  DTF  (P3 / P4 / P5)   │ ──► fused features
-                                              │  channel align +       │
-                                              │  token-selective attn   │
-                                              └───────────────────────┘
-                                                          ▲
-                 ┌─────────────────────────┐             │
- Depth Image ──► │  Depth Branch (PDER)     │ ──► F3_d, F4_d, F5_d
-                 └─────────────────────────┘
-                                                          │
-                                                          ▼
-                                          ┌───────────────────────────┐
-                                          │   RT-DETR Decoder Head      │
-                                          │   + QAKD (teacher→student)  │
-                                          └───────────────────────────┘
-                                                          │
-                                                          ▼
-                                              Wheat scab detections
+```text
+RGB image   ──► RGB branch with SSHR   ──► RGB features ┐
+                                                        ├─► DTF ─► RT-DETR decoder ─► detections
+Depth image ──► Depth branch with PDER ──► Depth features┘
+
+Teacher decoder outputs ──► high-confidence query selection ──► QAKD ──► student training
 ```
 
-### Components
+### Main components
 
-- **SSHR (RGB branch).** A series of convolutional blocks and C2f modules build multi-level RGB features, while SSBlocks are embedded into the deeper stages to enhance long-range dependency modeling. Instead of dense pixel-wise scanning, SSHR adopts a sparse process based on **region folding**, **similarity assignment**, and **feature scattering**: each feature map is folded into local regions, a small set of candidate centers is generated per region by adaptive pooling, pixels are softly assigned to their most relevant center, and a selective state-space scan models long-range context among region centers. The similarity computation scales as O(NK) (with K ≪ N) rather than O(N²).
+- **SSHR.** SSBlocks are embedded into deeper RGB stages to perform sparse region-level state-space scanning. Instead of scanning all pixels densely, SSHR uses region folding, similarity-based assignment, sparse state-space scanning, and feature scattering to capture long-range disease-context dependencies with reduced redundancy.
+- **PDER.** DERBlocks are inserted into deeper depth stages. A lightweight router selects Top-K experts, a shared expert stabilizes representation learning, and an auxiliary load-balancing loss prevents expert collapse.
+- **DTF.** RGB and depth features are first channel-aligned. P3 uses lightweight fusion to retain fine-grained disease appearance, while P4 and P5 use token-selective attention to retain the most relevant cross-modal token interactions.
+- **QAKD.** A pretrained HMQD-Net teacher is frozen. For each image, teacher queries with confidence above `0.05` are retained, and at most `K=100` queries are distilled. Classification distillation uses soft-label BCE, and box distillation uses L1 + GIoU.
 
-- **PDER (depth branch).** A progressive mixture-of-experts routing mechanism embedded at the higher-level depth stages. A lightweight router selects the Top-K experts per sample, a shared expert provides a stable base representation, and an auxiliary load-balancing constraint prevents router collapse. This allocates more capacity to regions with severe occlusion, complex depth variation, or ambiguous diseased-spike boundaries.
+---
 
-- **DTF (fusion).** Maps dual-stream features into a unified semantic space via channel alignment, then applies **Token-selective Attention (TSA)** at the deeper levels (P4/P5), retaining only the most relevant key–value pairs per query token to suppress redundant background. Shallow features (P3) use lightweight linear fusion to preserve fine-grained lesion detail.
+## 📂 Repository Structure
 
-- **QAKD (distillation).** A homogeneous self-distillation scheme. A complete HMQD-Net is **pre-trained to convergence on the target dataset and frozen as the teacher**; a student of the same architecture is then trained, distilling only high-confidence effective queries (classification via soft-label BCE, localization via L1 + GIoU). A linear warm-up gradually introduces teacher supervision. The teacher is used only during training, so inference cost is unchanged.
+The released repository will follow the structure below:
+
+```text
+HMQD/
+├── ultralytics/                         # model, training, validation, inference code
+├── configs/
+│   ├── hmqd_wsd_teacher.yaml
+│   ├── hmqd_wsd_student_qakd.yaml
+│   ├── hmqd_mswdd.yaml
+│   └── ablation/
+├── datasets/
+│   ├── WS-D/
+│   │   ├── rgb/
+│   │   │   ├── train/
+│   │   │   ├── val/
+│   │   │   └── test/
+│   │   ├── depth/
+│   │   │   ├── train/
+│   │   │   ├── val/
+│   │   │   └── test/
+│   │   └── annotations/
+│   │       ├── train.json
+│   │       ├── val.json
+│   │       └── test.json
+│   └── MSWDD/
+│       ├── rgb/
+│       ├── pseudo_depth_depthv3/
+│       └── annotations/
+├── splits/
+│   ├── wsd_train.txt
+│   ├── wsd_val.txt
+│   ├── wsd_test.txt
+│   ├── mswdd_train.txt
+│   ├── mswdd_val.txt
+│   └── mswdd_test.txt
+├── scripts/
+│   ├── preprocess_wsd_depth.py
+│   ├── generate_mswdd_depthv3.py
+│   ├── train_teacher.sh
+│   ├── train_student_qakd.sh
+│   ├── eval_wsd.sh
+│   ├── eval_mswdd.sh
+│   └── export_tensorrt.sh
+├── weights/
+├── tools/
+├── environment.yaml
+├── requirements.txt
+└── README.md
+```
 
 ---
 
 ## 📂 Dataset: WS-D
 
-The **WS-D** dataset is a UAV-based RGB-D wheat scab detection dataset constructed through field-site selection, low-altitude multimodal image acquisition, and image preprocessing with annotation.
+The **WS-D** dataset is a UAV-based RGB-D wheat scab detection dataset constructed by low-altitude RGB-D image acquisition, RGB-depth registration, cropping, annotation, and fixed train/validation/test partitioning.
 
-| Parameter | Specification |
+### WS-D acquisition summary
+
+| Item | Specification |
 | --- | --- |
 | Collection period | March–May 2025 |
-| Collection sites | Bazhen (Chaohu City), Lujiang County, Shucheng County, Anhui, China |
-| Camera | Stereolabs ZED X stereo depth camera |
-| Modalities | RGB + Depth |
-| UAV flight altitude | 2–3 m |
-| Image resolution | 640 × 640 |
-| Annotation tool | Make Sense (exported in COCO format) |
-| Total images | 1,950 (greenhouse 1,250 / outdoor 700) |
-| Disease instances | 6,799 |
-| Train / Test split | 1,560 / 390 (8:2) |
+| Collection sites | Bazhen, Lujiang, Shucheng, Anhui Province, China |
+| Bazhen coordinate | 31.7175334°N, 117.4275124°E; altitude 7.48 m |
+| Lujiang coordinate | 31.8740037°N, 116.6825007°E; altitude 35.17 m |
+| Shucheng coordinate | 31.4486161°N, 116.9782291°E; altitude 17.57 m |
+| Camera | Stereolabs ZED X stereo RGB-D camera |
+| Modalities | RGB + depth |
+| UAV flight altitude | 2–3 m above canopy |
+| Registered image size | 640 × 640 pixels |
+| Annotation tool | Make Sense |
+| Annotation format | COCO detection format |
+| Total source images | 1,950 |
+| Greenhouse / outdoor images | 1,250 / 700 |
+| Annotated diseased-spike instances | 6,799 |
 
-**Annotation quality control.** All diseased-spike regions were independently annotated by four agronomy experts following a unified annotation protocol. 10% of the images were randomly selected for cross-checking among the experts, and inconsistent or ambiguous annotations were resolved through joint discussion until consensus was reached, while invalid boxes were removed.
+### Fixed WS-D split
 
+The dataset was split **at the source-image level before any cropping or augmentation**. The 1,950 source images were first divided into a training pool and a test set at an 8:2 ratio. The training pool was then split into training and validation subsets at an 8:2 ratio. The final train/validation/test proportions are therefore 64%/16%/20%.
+
+| Subset | Images | Instances | Proportion |
+| --- | ---: | ---: | ---: |
+| Train | 1,248 | 4,620 | 64% |
+| Validation | 312 | 1,029 | 16% |
+| Test | 390 | 1,150 | 20% |
+| Total | 1,950 | 6,799 | 100% |
+
+### COCO-scale distribution
+
+| Scale | COCO definition | Count | Proportion |
+| --- | --- | ---: | ---: |
+| Small | area < 32² pixels | 3,529 | 51.9% |
+| Medium | 32² ≤ area < 96² pixels | 3,197 | 47.0% |
+| Large | area ≥ 96² pixels | 73 | 1.1% |
+
+### Field/session metadata
+
+The following metadata files will be released with the dataset to help users check potential spatial or acquisition-level dependence:
+
+```text
+metadata/wsd_image_metadata.csv
+metadata/wsd_site_plot_flight_session_summary.csv
+```
+
+The metadata table will include at least the following fields:
+
+| Field | Description |
+| --- | --- |
+| `image_id` | Unique source image identifier |
+| `subset` | train / val / test |
+| `site` | Bazhen / Lujiang / Shucheng |
+| `plot_id` | Field plot identifier |
+| `flight_id` | UAV flight identifier |
+| `session_id` | Acquisition session identifier |
+| `capture_mode` | Stop-and-shoot single-frame capture |
+| `rgb_path` | RGB file path |
+| `depth_path` | Depth file path |
+| `annotation_path` | COCO annotation file |
+
+> **TODO_VERIFY before final public release:** update exact site/plot/flight/session counts in `metadata/wsd_site_plot_flight_session_summary.csv` after final metadata audit.
+
+### Annotation reliability
+
+All images were annotated by agronomy-trained annotators using a unified protocol. Each source image was assigned to one primary annotator. A randomly selected 10% subset was independently cross-checked by a second annotator. Disagreements were resolved by consensus discussion.
+
+The released repository will include:
+
+```text
+metadata/annotation_protocol.md
+metadata/inter_annotator_agreement.csv
+metadata/cross_check_discrepancies.csv
+```
+
+The cross-check table will report:
+
+| Metric | Value |
+| --- | ---: |
+| Cross-checked images | 195 |
+| IoU threshold for box agreement | 0.50 |
+| Matched boxes | TODO_VERIFY |
+| Discrepant boxes | TODO_VERIFY |
+| Corrected boxes | TODO_VERIFY |
+| Removed boxes | TODO_VERIFY |
+| Added boxes after consensus | TODO_VERIFY |
+| Box-level agreement rate | TODO_VERIFY |
+
+> The `TODO_VERIFY` values are placeholders for the final audited annotation-quality statistics and should be replaced before repository release.
+
+---
+
+## 🌊 Depth Preprocessing
+
+### WS-D real depth
+
+Depth maps in WS-D were acquired using the Stereolabs ZED X camera and spatially aligned to RGB images using the manufacturer-provided SDK. The depth values are handled as metric depth and converted to meters in preprocessing.
+
+Invalid depth pixels are detected using the following rules:
+
+- non-finite values: `NaN` or `Inf`;
+- zero or negative depth values;
+- values outside the practical valid range used in this study;
+- isolated invalid pixels after registration.
+
+Because the UAV flight height was 2–3 m and the camera operated within its effective sensing range, the practical valid range was set to:
+
+```text
+valid_depth_range = [0.3 m, 20.0 m]
+```
+
+The preprocessing pipeline is:
+
+1. RGB-depth registration using the Stereolabs SDK.
+2. Invalid-value masking according to the rules above.
+3. Local filtering of isolated invalid pixels.
+4. Hole filling by nearest-neighbor interpolation from surrounding valid pixels.
+5. Light median filtering to suppress local noise while preserving spike boundaries.
+6. Depth clipping to `[0.3 m, 20.0 m]`.
+7. Min–max normalization to `[0, 1]`.
+8. Encoding as a single-channel floating-point depth image.
+
+The corresponding implementation will be released as:
+
+```bash
+python scripts/preprocess_wsd_depth.py \
+  --rgb-dir datasets/WS-D/raw_rgb \
+  --depth-dir datasets/WS-D/raw_depth \
+  --out-dir datasets/WS-D/depth \
+  --min-depth 0.3 \
+  --max-depth 20.0 \
+  --fill nearest \
+  --median-kernel 3
+```
+
+### MSWDD pseudo-depth
+
+MSWDD does not provide real depth measurements. Therefore, pseudo-depth maps were generated from RGB images using **Depth Anything V3**. These maps do not represent metric sensor depth and are used only as relative structural cues.
+
+```bash
+python scripts/generate_mswdd_depthv3.py \
+  --rgb-root datasets/MSWDD/rgb \
+  --out-root datasets/MSWDD/pseudo_depth_depthv3 \
+  --model depth-anything-v3 \
+  --normalize minmax
+```
+
+Pseudo-depth maps are generated independently for the training, validation, and test partitions. Test-set pseudo-depth maps are used only during evaluation and are never used for training or model selection.
+
+---
+
+## 🔁 Data Augmentation
+
+All geometric transformations are applied **synchronously** to RGB images, depth maps, and bounding boxes using identical transformation parameters to preserve cross-modal spatial consistency.
+
+The released training configuration will include the complete augmentation settings. The default settings used for the reported experiments are summarized below.
+
+| Operation | Probability | Parameter range / setting | Applied to |
+| --- | ---: | --- | --- |
+| Horizontal flip | 0.5 | left-right flip | RGB, depth, boxes |
+| Random scale | 1.0 | 0.5–1.5 | RGB, depth, boxes |
+| Random translation | 1.0 | ±10% image size | RGB, depth, boxes |
+| Random crop / resize | 1.0 | output 640 × 640 | RGB, depth, boxes |
+| HSV color jitter | 1.0 | h=0.015, s=0.7, v=0.4 | RGB only |
+| Mosaic | 0.0 | disabled for RGB-D alignment stability | — |
+| MixUp | 0.0 | disabled | — |
+
+> **TODO_VERIFY before final release:** ensure these values exactly match the final YAML training configuration. If the final RT-DETR baseline uses different augmentation ranges, update this table and `configs/*.yaml` consistently.
 
 ---
 
 ## ⚙️ Installation
 
-> Code and environment files will be released upon acceptance. The intended setup is summarized below.
-
 ```bash
-# 1. Clone the repository
+# 1. Clone repository
 git clone https://github.com/yangjie1874/HMQD.git
 cd HMQD
 
-# 2. Create the environment
+# 2. Create environment
 conda create -n hmqd python=3.10 -y
 conda activate hmqd
 
-# 3. Install dependencies
+# 3. Install PyTorch, then project dependencies
+pip install torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
-# (PyTorch, torchvision, mamba-ssm, einops, pycocotools, etc.)
+
+# 4. Install optional acceleration packages
+pip install mamba-ssm==1.2.0.post1 causal-conv1d==1.2.0.post2
 ```
 
----
+### Tested environment
 
-## 🚀 Usage
-
-> The following commands reflect the intended released interface.
-
-### Data preparation
-
-```
-HMQD/
-├── datasets/
-│   ├── WS-D/
-│   │   ├── rgb/                # RGB images (640×640)
-│   │   ├── depth/              # aligned depth maps
-│   │   └── annotations/
-│   │       ├── train.json      # COCO format
-│   │       └── test.json
-│   └── MSWDD/                  # pseudo-depth generated by Depth-Anything V3
-```
-
-### Training
-
-```bash
-# Stage 1: train the teacher model to convergence
-python train.py --config configs/hmqd_wsd_teacher.yml
-
-# Stage 2: train the student model with QAKD (teacher frozen)
-python train.py --config configs/hmqd_wsd_student.yml --teacher weights/teacher_best.pth
-```
-
-### Evaluation
-
-```bash
-python eval.py --config configs/hmqd_wsd_student.yml --weights weights/hmqd_best.pth
-```
-
-### Inference
-
-```bash
-python infer.py --rgb path/to/rgb.png --depth path/to/depth.png --weights weights/hmqd_best.pth
-```
+| Item | Version |
+| --- | --- |
+| OS | Ubuntu 22.04 LTS |
+| Python | 3.10 |
+| PyTorch | 2.1.2 |
+| Torchvision | 0.16.2 |
+| CUDA | 12.1 |
+| cuDNN | 8.9 |
+| Ultralytics base | TODO_VERIFY commit hash |
+| mamba-ssm | 1.2.0.post1 |
+| einops | 0.7.0 |
+| pycocotools | 2.0.7 |
+| OpenCV | 4.8.1 |
+| GPU for training | NVIDIA GeForce RTX 4090 |
+| Edge device | NVIDIA Jetson Orin Nano 8GB |
+| JetPack | 6.1 |
+| TensorRT | 10.3 |
 
 ---
 
 ## 🛠️ Implementation Details
 
-HMQD-Net is implemented based on the RT-DETR framework, and the basic training settings follow those of the original RT-DETR to ensure a fair comparison.
-
 | Setting | Value |
 | --- | --- |
-| Base framework | RT-DETR |
-| Max epochs | 300 (early stopping, patience = 120) |
+| Base detector | RT-DETR |
 | Input size | 640 × 640 |
 | Batch size | 4 |
-| Initial learning rate (lr) | 0.01 |
-| Final lr factor (lrf) | 0.01 |
+| Maximum epochs | 300 |
+| Early-stopping patience | 120 epochs |
+| Checkpoint selection | best validation AP / validation fitness (`TODO_VERIFY`) |
+| Optimizer | SGD (`TODO_VERIFY`) |
+| Initial learning rate | 0.01 |
+| Final learning-rate factor | 0.01 |
+| Weight decay | 0.0005 (`TODO_VERIFY`) |
+| Momentum | 0.937 (`TODO_VERIFY`) |
 | Warm-up momentum | 0.8 |
-| Data augmentation | identical to RT-DETR baseline |
-| Random seed | 0 (results averaged over 3 runs) |
-| QAKD: query bound K | 100 |
-| QAKD: confidence threshold τ | 0.05 |
-| QAKD: distillation weight λ_kd | 0.5 |
-| QAKD: warm-up epochs E_w | 5 |
-| GPU | NVIDIA GeForce RTX 4090 |
+| LR schedule | cosine schedule (`TODO_VERIFY`) |
+| Pretrained initialization | RT-DETR/ImageNet-pretrained backbone (`TODO_VERIFY`) |
+| Decoder queries | 300 |
+| Confidence threshold for evaluation | 0.001 (`TODO_VERIFY`) |
+| NMS | not used for RT-DETR-style set prediction |
+| Evaluation metrics | COCO AP, AP50, AP75, APs, APm, APl |
+| Random seeds for repeated runs | 0, 49, 99 |
+
+### Module-specific settings
+
+| Component | Setting |
+| --- | --- |
+| SSHR insertion | P4 and P5 RGB stages |
+| SSBlock repeats | P4=1, P5=3 |
+| PDER insertion | P4 and P5 depth stages |
+| PDER experts | P4=4, P5=8 (`P3=4 if enabled`) |
+| PDER Top-K experts | 2 |
+| DTF attention heads | 8 |
+| DTF token selection ratio | 0.8 |
+| DTF channel groups | 4 |
+| QAKD query confidence threshold | 0.05 |
+| QAKD maximum selected queries | 100 |
+| QAKD classification weight | 1.0 |
+| QAKD box weight | 1.0 |
+| QAKD overall weight | 0.5 |
+| QAKD warm-up epochs | 5 |
 
 ---
 
-## 📊 Results
+## 🚀 Training and Evaluation
 
-### Detection results on WS-D
-
-| Method | Modality | AP (%) | AP50 (%) | AP75 (%) | APs (%) |
-| --- | --- | --- | --- | --- | --- |
-| RT-DETR | RGB | 24.5 | 60.2 | 13.8 | 20.8 |
-| RT-DETR-D | RGB-D | 24.4 | 60.3 | 12.9 | 20.5 |
-| **HMQD-Net (Ours)** | RGB-D | **32.4** | **68.7** | **20.8** | **31.7** |
-
-### Generalization on MSWDD
-
-| Method | Modality | AP (%) | AP50 (%) | AP75 (%) |
-| --- | --- | --- | --- | --- |
-| RT-DETR-D | RGB-D | 75.6 | 95.6 | 69.3 |
-| **HMQD-Net (Ours)** | RGB-D | **76.8** | **96.5** | **69.9** |
-
-### Edge deployment
-
-| Platform | Format | Precision | Latency (ms) | FPS | Peak Memory (MB) | AP50 (%) |
-| --- | --- | --- | --- | --- | --- | --- |
-| Server (RTX 4090) | PyTorch | FP32 | 11.8 | 87.4 | 3032 | 68.7 |
-| Jetson Orin Nano 8GB | TensorRT | FP16 | 46.3 | 21.6 | 1925 | 65.9 |
-
----
-
-## 🌾 Practical Deployment
-
-For on-board UAV deployment, the trained model can be exported from PyTorch (`.pt`) to a TensorRT (`.engine`) format with FP16 precision, enabling near-real-time inference on resource-constrained edge hardware such as the Jetson Orin Nano. The spike-level detection results can be aggregated into field-scale infection maps to support agricultural decision-making, such as identifying high-risk regions, planning targeted fungicide spraying, and prioritizing field inspection.
+### Stage 1: train teacher model
 
 ```bash
-# Export to ONNX, then build a TensorRT FP16 engine
-python export.py --weights weights/hmqd_best.pth --format onnx
-trtexec --onnx=hmqd.onnx --fp16 --saveEngine=hmqd.engine
+bash scripts/train_teacher.sh
 ```
+
+Equivalent command:
+
+```bash
+python train.py \
+  --data configs/data/wsd.yaml \
+  --model configs/hmqd_wsd_teacher.yaml \
+  --imgsz 640 \
+  --batch 4 \
+  --epochs 300 \
+  --patience 120 \
+  --seed 0 \
+  --project runs/wsd \
+  --name hmqd_teacher
+```
+
+### Stage 2: train student model with QAKD
+
+```bash
+bash scripts/train_student_qakd.sh
+```
+
+Equivalent command:
+
+```bash
+python train.py \
+  --data configs/data/wsd.yaml \
+  --model configs/hmqd_wsd_student.yaml \
+  --teacher weights/hmqd_teacher_best.pt \
+  --distill qakd \
+  --qakd-conf 0.05 \
+  --qakd-topk 100 \
+  --qakd-weight 0.5 \
+  --qakd-warmup 5 \
+  --imgsz 640 \
+  --batch 4 \
+  --epochs 300 \
+  --patience 120 \
+  --seed 0 \
+  --project runs/wsd \
+  --name hmqd_student_qakd
+```
+
+### Evaluation on WS-D
+
+```bash
+bash scripts/eval_wsd.sh
+```
+
+```bash
+python val.py \
+  --data configs/data/wsd.yaml \
+  --weights weights/hmqd_best.pt \
+  --imgsz 640 \
+  --batch 1 \
+  --task test
+```
+
+### Evaluation on MSWDD
+
+```bash
+bash scripts/eval_mswdd.sh
+```
+
+```bash
+python train.py \
+  --data configs/data/mswdd.yaml \
+  --model configs/hmqd_mswdd.yaml \
+  --imgsz 640 \
+  --batch 4 \
+  --epochs 300 \
+  --seed 0
+
+python val.py \
+  --data configs/data/mswdd.yaml \
+  --weights weights/hmqd_mswdd_best.pt \
+  --imgsz 640 \
+  --task test
+```
+
+---
+
+## 📊 Principal Results
+
+### WS-D test set
+
+Results are reported as mean ± standard deviation over three independent runs using fixed data partitions and seeds 0, 49, and 99 where available.
+
+| Method | Modality | AP (%) | AP50 (%) | AP75 (%) | APs (%) | APm (%) | APl (%) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Faster R-CNN | RGB | 11.4 | 40.2 | 9.8 | 15.5 | 25.9 | 32.1 |
+| YOLOv8s | RGB | 24.8 | 57.7 | 12.1 | 20.1 | 26.3 | 37.5 |
+| YOLOv11s | RGB | 23.2 | 58.1 | 12.6 | 19.4 | 27.2 | 36.7 |
+| YOLOv26s | RGB | 24.0 | 58.6 | 12.3 | 19.3 | 26.4 | 38.3 |
+| D-FINE | RGB | 23.6 | 59.2 | 12.9 | 20.4 | 27.1 | 38.1 |
+| DEIM | RGB | 24.1 | 59.8 | 12.4 | 21.7 | 28.3 | 38.4 |
+| RT-DETR | RGB | 24.5±0.2 | 60.2±0.1 | 13.8±0.3 | 20.8±0.3 | 28.7±0.3 | 37.9±0.2 |
+| RT-DETR-D | RGB-D | 24.4±0.2 | 60.3±0.2 | 12.9±0.1 | 20.5±0.1 | 28.4±0.3 | 38.1±0.1 |
+| MEDUSA | RGB-D | 15.2±0.5 | 46.8±0.4 | 10.3±0.7 | 19.7±0.4 | 25.0±0.5 | 33.9±0.4 |
+| ICAFusion | RGB-D | 23.0±0.3 | 56.9±0.3 | 12.4±0.2 | 18.9±0.3 | 26.9±0.4 | 38.3±0.4 |
+| **HMQD-Net** | RGB-D | **32.4±0.1** | **68.7±0.1** | **20.8±0.2** | **31.7±0.1** | **36.9±0.2** | **45.5±0.2** |
+
+### Module ablation on WS-D validation set
+
+| SSHR | PDER | DTF | QAKD | AP (%) | AP50 (%) | AP75 (%) | APs (%) | APm (%) | APl (%) |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+|  |  |  |  | 24.4±0.2 | 60.3±0.2 | 12.9±0.1 | 20.5±0.1 | 28.4±0.3 | 38.1±0.1 |
+| ✓ |  |  |  | 26.2±0.1 | 65.8±0.2 | 13.3±0.2 | 26.1±0.1 | 30.1±0.1 | 40.2±0.2 |
+|  | ✓ |  |  | 25.1±0.3 | 64.0±0.2 | 12.8±0.1 | 25.3±0.2 | 29.4±0.3 | 39.9±0.2 |
+|  |  | ✓ |  | 24.9±0.2 | 62.0±0.1 | 13.3±0.1 | 22.4±0.2 | 29.1±0.3 | 39.4±0.3 |
+|  |  |  | ✓ | 25.0±0.1 | 61.4±0.1 | 15.9±0.2 | 23.7±0.1 | 29.3±0.2 | 40.0±0.2 |
+| ✓ | ✓ |  |  | 27.5±0.3 | 66.0±0.2 | 14.8±0.3 | 27.8±0.3 | 31.8±0.1 | 42.3±0.2 |
+| ✓ | ✓ | ✓ |  | 32.3±0.1 | 68.4±0.1 | 20.5±0.2 | 31.5±0.1 | 36.5±0.2 | 45.2±0.1 |
+| ✓ | ✓ | ✓ | ✓ | **32.4±0.1** | **68.7±0.3** | **20.8±0.3** | **31.7±0.2** | **36.9±0.2** | **45.5±0.1** |
+
+### QAKD training overhead
+
+QAKD is a training-time refinement. It uses a frozen teacher forward pass during student training but does not modify the student architecture used for inference.
+
+| Training setting | GPU-hours | Peak training memory | Inference overhead |
+| --- | ---: | ---: | --- |
+| HMQD-Net without QAKD | 3.2 | 4,421 MB | none |
+| HMQD-Net with QAKD | 5.3 | 5,623 MB | none |
+
+> The numbers above describe the student training stage. Teacher pretraining cost should be counted separately when reporting total training budget. `TODO_VERIFY`: update total teacher + student GPU-hours after final timing audit.
+
+### MSWDD external dataset validation
+
+All methods are trained from scratch on the official MSWDD training split and evaluated on the corresponding test split. Since MSWDD does not contain depth images, pseudo-depth maps are generated using Depth Anything V3.
+
+| Method | Modality | AP (%) | AP50 (%) | AP75 (%) | APs (%) | APm (%) | APl (%) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Faster R-CNN | RGB | 56.1 | 85.4 | 42.5 | — | 64.2 | 70.9 |
+| YOLOv8s | RGB | 72.1 | 94.1 | 68.9 | — | 76.3 | 80.4 |
+| YOLOv11s | RGB | 72.5 | 94.3 | 68.4 | — | 76.2 | 80.5 |
+| YOLOv26s | RGB | 71.6 | 93.7 | 68.0 | — | 75.8 | 80.1 |
+| D-FINE | RGB | 73.8 | 95.2 | 69.2 | — | 77.2 | 81.0 |
+| DEIM | RGB | 74.1 | 95.8 | 69.4 | — | 77.6 | 81.3 |
+| RT-DETR | RGB | 74.2 | 95.5 | 69.1 | — | 78.0 | 80.2 |
+| RT-DETR-D | RGB-D | 75.6 | 95.6 | 69.3 | — | 79.4 | 85.6 |
+| **HMQD-Net** | RGB-D | **76.8** | **96.5** | **69.9** | — | **81.7** | **90.5** |
+
+> `APs` is not reported because MSWDD does not contain small objects under the COCO scale definition used in our evaluation.
+
+---
+
+## 🚀 Edge Deployment
+
+The trained model can be exported from PyTorch to TensorRT FP16 for edge-device evaluation.
+
+```bash
+python export.py --weights weights/hmqd_best.pt --format onnx --imgsz 640
+trtexec --onnx=hmqd.onnx --fp16 --saveEngine=hmqd_fp16.engine
+```
+
+The reported Jetson latency includes preprocessing, model inference, and post-processing at batch size 1. Measurements use 50 warm-up runs followed by 100 timed repetitions.
+
+| Platform | Runtime | Precision | Power mode | Latency | FPS | Peak memory | AP50 |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| RTX 4090 | PyTorch | FP32 | — | 11.8 ms | 84.7 | 3,032 MB | 68.7 |
+| Jetson Orin Nano 8GB | TensorRT 10.3 | FP16 | default | 46.3 ms | 21.6 | 1,925 MB | 65.9 |
+
+> The Jetson experiment evaluates feasibility for future onboard deployment. It does not include full UAV-flight validation, camera acquisition latency, power consumption under flight conditions, thermal throttling analysis, or payload/flight-duration constraints.
+
+---
+
+## 📌 Reproducibility Checklist
+
+Before public release, the repository will include:
+
+- [ ] complete WS-D RGB-D dataset or documented access procedure;
+- [ ] fixed train/validation/test split files;
+- [ ] COCO annotations for all subsets;
+- [ ] source-image metadata with site/plot/flight/session IDs;
+- [ ] RGB-depth preprocessing scripts;
+- [ ] MSWDD pseudo-depth generation scripts;
+- [ ] complete training configuration files;
+- [ ] augmentation settings with probabilities and ranges;
+- [ ] pretrained weights for principal models;
+- [ ] ablation model configurations;
+- [ ] environment files and tested library versions;
+- [ ] commands to reproduce each principal table;
+- [ ] annotation protocol and inter-annotator agreement files;
+- [ ] TensorRT export and edge-evaluation scripts.
 
 ---
 
 ## 📖 Citation
 
-If you find this work useful, please consider citing our paper (full citation will be updated upon publication):
+If you find this work useful, please cite:
 
 ```bibtex
-@article{hmqdnet,
+@article{hmqdnet2026,
   title   = {Hierarchical multimodal representation and query-aware distillation for UAV-based wheat scab monitoring},
-  author  = {XXX and XXX and XXX},
+  author  = {TODO_UPDATE},
   journal = {Engineering Applications of Artificial Intelligence},
   year    = {2026},
   note    = {Under review}
@@ -251,15 +601,16 @@ If you find this work useful, please consider citing our paper (full citation wi
 
 ## 🙏 Acknowledgements
 
-This work is built upon the excellent [**RT-DETR**](https://github.com/lyuwenyu/RT-DETR) codebase. We also thank the authors of [Mamba / Vision Mamba](https://github.com/hustvl/Vim) and [Depth-Anything](https://github.com/DepthAnything) for their open-source contributions, which inspired parts of our design.
+This work is built upon the excellent [RT-DETR](https://github.com/lyuwenyu/RT-DETR) codebase. We also thank the authors of Mamba, Depth Anything, MEDUSA, and ICAFusion for their open-source contributions and related studies.
+
 ---
 
 ## 📬 Contact
 
-For questions about the paper, the WS-D dataset, or the code release, please open an issue in this repository or contact the authors. We will respond and complete the public release of all code, weights, and data **upon acceptance of the paper**.
+For questions about the paper, dataset, code, or reproduction protocol, please open an issue or contact the authors. Code, data, fixed splits, pretrained weights, and reproduction scripts will be released upon paper acceptance.
 
 ---
 
 ## 📄 License
 
-The code and dataset will be released under an appropriate open-source / academic-use license upon publication. Until then, all rights are reserved by the authors.
+The code and dataset will be released under an appropriate academic-use/open-source license upon publication. Until then, all rights are reserved by the authors.
